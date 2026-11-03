@@ -427,15 +427,19 @@ elif page == "Analyze Image":
                     predictions[predicted_grade] * 100
                 )
 
-            st.session_state.last_prediction = {
-                "Grade": predicted_grade,
-                "Diagnosis": DR_GRADES[predicted_grade],
-                "Score": round(confidence, 2),
-                "Time": datetime.now().strftime(
-                    "%d-%m-%Y %H:%M:%S"
-                ),
-                "Image": uploaded_file.name
-            }
+           st.session_state.last_prediction = {
+    "Grade": predicted_grade,
+    "Diagnosis": DR_GRADES[predicted_grade],
+    "Score": round(confidence, 2),
+    "Time": datetime.now().strftime(
+        "%d-%m-%Y %H:%M:%S"
+    ),
+    "Image": uploaded_file.name,
+    "Grade Scores": [
+        round(float(x) * 100, 2)
+        for x in predictions
+    ]
+}
 
             st.session_state.history.append(
                 st.session_state.last_prediction.copy()
