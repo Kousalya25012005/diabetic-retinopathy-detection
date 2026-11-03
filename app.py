@@ -146,11 +146,7 @@ st.sidebar.divider()
 st.sidebar.info(
     "Research prototype based on the APTOS 2019 dataset."
 )
-
-# ---------------- HOME PAGE ----------------
-
-
-   
+  
 # ---------------- HOME PAGE ----------------
 
 if page == "Home":
@@ -427,7 +423,7 @@ elif page == "Analyze Image":
                     predictions[predicted_grade] * 100
                 )
 
-             st.session_state.last_prediction = {
+                        st.session_state.last_prediction = {
                 "Grade": predicted_grade,
                 "Diagnosis": DR_GRADES[predicted_grade],
                 "Score": round(confidence, 2),
