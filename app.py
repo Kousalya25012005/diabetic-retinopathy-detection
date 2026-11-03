@@ -170,7 +170,7 @@ elif page == "Analyze Image":
                 use_container_width=True
             )
                     
-         with col2:
+        with col2:
             st.write("### Image Information")
             st.write("File name:", uploaded_file.name)
             st.write("Image dimensions:", image.size)
