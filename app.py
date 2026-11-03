@@ -17,35 +17,84 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+
+/* Main background and default text */
 .stApp {
     background-color: #F4F8FC;
+    color: #183153;
 }
 
+/* Main headings */
+h1, h2, h3, h4 {
+    color: #12304A !important;
+}
+
+/* Paragraphs and normal text */
+p, label, .stMarkdown, .stText {
+    color: #263E55;
+}
+
+/* Sidebar */
 [data-testid="stSidebar"] {
     background-color: #102A43;
 }
 
 [data-testid="stSidebar"] * {
-    color: white;
+    color: #FFFFFF !important;
 }
 
-.main-title {
-    color: #12304A;
-    font-size: 36px;
-    font-weight: 700;
+/* Sidebar selected navigation */
+[data-testid="stSidebar"] [aria-checked="true"] {
+    background-color: #176B87;
 }
 
-.subtitle {
-    color: #627D98;
-    font-size: 16px;
-}
-
-div[data-testid="stMetric"] {
-    background-color: white;
+/* Metric cards */
+[data-testid="stMetric"] {
+    background-color: #FFFFFF;
     padding: 18px;
     border-radius: 12px;
     border: 1px solid #D9E2EC;
 }
+
+[data-testid="stMetricLabel"] {
+    color: #486581 !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: #12304A !important;
+}
+
+/* Input fields */
+.stTextInput input,
+.stFileUploader,
+.stSelectbox div {
+    color: #183153;
+}
+
+/* Expanders */
+[data-testid="stExpander"] {
+    background-color: #FFFFFF;
+    border: 1px solid #D9E2EC;
+    border-radius: 10px;
+}
+
+/* Buttons */
+.stButton button {
+    background-color: #176B87;
+    color: #FFFFFF;
+    border-radius: 8px;
+    border: none;
+}
+
+.stButton button p {
+    color: #FFFFFF !important;
+}
+
+/* Footer */
+.stCaption {
+    color: #627D98 !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
