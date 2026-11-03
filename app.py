@@ -442,7 +442,6 @@ Consult a qualified ophthalmologist for clinical assessment.
         "This application is for research and educational use only. "
         "It cannot diagnose or rule out diabetic retinopathy."
     )
-
 # ---------------- HISTORY & ANALYTICS ----------------
 
 elif page == "History & Analytics":
