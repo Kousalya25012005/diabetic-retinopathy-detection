@@ -1,14 +1,55 @@
-
 import streamlit as st
 import tensorflow as tf
 import numpy as np
+import pandas as pd
 from PIL import Image, ImageOps
+from datetime import datetime
+
+# ---------------- PAGE CONFIGURATION ----------------
 
 st.set_page_config(
-    page_title="Diabetic Retinopathy Detection",
+    page_title="RetinaAI | DR Screening",
     page_icon="👁️",
-    layout="centered"
+    layout="wide"
 )
+
+# ---------------- CUSTOM DESIGN ----------------
+
+st.markdown("""
+<style>
+.stApp {
+    background-color: #F4F8FC;
+}
+
+[data-testid="stSidebar"] {
+    background-color: #102A43;
+}
+
+[data-testid="stSidebar"] * {
+    color: white;
+}
+
+.main-title {
+    color: #12304A;
+    font-size: 36px;
+    font-weight: 700;
+}
+
+.subtitle {
+    color: #627D98;
+    font-size: 16px;
+}
+
+div[data-testid="stMetric"] {
+    background-color: white;
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid #D9E2EC;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------- MODEL ----------------
 
 MODEL_PATH = "dr_model.keras"
 
@@ -18,6 +59,8 @@ def load_model():
 
 model = load_model()
 
+# ---------------- DISEASE GRADES ----------------
+
 DR_GRADES = {
     0: "No Diabetic Retinopathy",
     1: "Mild Diabetic Retinopathy",
@@ -26,64 +69,324 @@ DR_GRADES = {
     4: "Proliferative Diabetic Retinopathy"
 }
 
-st.title("👁️ Diabetic Retinopathy Detection")
-st.write(
-    "Upload a retinal fundus image to receive an AI-based "
-    "diabetic retinopathy grade prediction."
+GRADE_INFO = {
+    0: "No visible signs of diabetic retinopathy in the image.",
+    1: "Mild changes may be present in the retinal blood vessels.",
+    2: "Moderate retinal changes may be present.",
+    3: "Severe retinal abnormalities may be present.",
+    4: "Advanced retinal changes may be present."
+}
+
+# ---------------- SESSION HISTORY ----------------
+
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+# ---------------- SIDEBAR ----------------
+
+st.sidebar.title("👁️ RetinaAI")
+st.sidebar.caption("AI-Based Retinal Image Analysis")
+st.sidebar.divider()
+
+page = st.sidebar.radio(
+    "Navigation",
+    ["Home", "Analyze Image", "History & Analytics"]
 )
 
-uploaded_file = st.file_uploader(
-    "Upload retinal image",
-    type=["jpg", "jpeg", "png"]
+st.sidebar.divider()
+st.sidebar.info(
+    "Research prototype based on the APTOS 2019 dataset."
 )
 
-if uploaded_file is not None:
+# ---------------- HOME PAGE ----------------
 
-    image = Image.open(uploaded_file)
-    image = ImageOps.exif_transpose(image).convert("RGB")
+if page == "Home":
 
-    st.image(image, caption="Uploaded Retinal Image",
-             use_container_width=True)
+    st.markdown(
+        '<p class="main-title">Diabetic Retinopathy Screening</p>',
+        unsafe_allow_html=True
+    )
 
-    if st.button("Analyze Retinal Image"):
+    st.markdown(
+        '<p class="subtitle">AI-powered retinal image classification using EfficientNetB0.</p>',
+        unsafe_allow_html=True
+    )
 
-        with st.spinner("Analyzing image..."):
+    st.divider()
 
-            processed_image = image.resize((224, 224))
-            image_array = np.array(
-                processed_image, dtype=np.float32
+    total = len(st.session_state.history)
+
+    st.subheader("Dashboard Overview")
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Total Predictions", total)
+
+    col2.metric(
+        "Grades Detected",
+        len(set(x["Grade"] for x in st.session_state.history))
+    )
+
+    col3.metric(
+        "Model",
+        "EfficientNetB0"
+    )
+
+    st.divider()
+
+    st.subheader("About This Project")
+
+    st.write("""
+    This application uses a deep learning model to classify
+    retinal fundus images into five diabetic retinopathy grades.
+
+    The model is based on EfficientNetB0 and was trained using
+    the APTOS 2019 Blindness Detection dataset.
+    """)
+
+    st.subheader("Five Classification Grades")
+
+    for grade, name in DR_GRADES.items():
+        with st.expander(f"Grade {grade}: {name}"):
+            st.write(GRADE_INFO[grade])
+
+    st.info(
+        "Upload a retinal fundus image using the Analyze Image "
+        "section to generate a prediction."
+    )
+
+# ---------------- IMAGE ANALYSIS ----------------
+
+elif page == "Analyze Image":
+
+    st.title("🔬 Analyze Retinal Image")
+
+    st.write(
+        "Upload a retinal fundus photograph for AI-based "
+        "classification."
+    )
+
+    uploaded_file = st.file_uploader(
+        "Choose retinal image",
+        type=["jpg", "jpeg", "png"]
+    )
+
+    if uploaded_file is not None:
+
+        image = Image.open(uploaded_file)
+        image = ImageOps.exif_transpose(image).convert("RGB")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.image(
+                image,
+                caption="Uploaded Retinal Image",
+                use_container_width=True
             )
-            image_array = np.expand_dims(image_array, axis=0)
 
-            predictions = model.predict(
-                image_array, verbose=0
-            )[0]
+        with col2:
+            st.write("### Image Information")
+            st.write("File name:", uploaded_file.name)
+            st.write("Image dimensions:", image.size)
 
-            predicted_grade = int(np.argmax(predictions))
-            confidence = float(
-                predictions[predicted_grade] * 100
+        if st.button("Analyze Image", type="primary"):
+
+            with st.spinner("Analyzing retinal image..."):
+
+                processed_image = image.resize((224, 224))
+
+                image_array = np.array(
+                    processed_image,
+                    dtype=np.float32
+                )
+
+                image_array = np.expand_dims(
+                    image_array, axis=0
+                )
+
+                predictions = model.predict(
+                    image_array,
+                    verbose=0
+                )[0]
+
+                predicted_grade = int(np.argmax(predictions))
+
+                confidence = float(
+                    predictions[predicted_grade] * 100
+                )
+
+            st.session_state.last_prediction = {
+                "Grade": predicted_grade,
+                "Diagnosis": DR_GRADES[predicted_grade],
+                "Score": round(confidence, 2),
+                "Time": datetime.now().strftime(
+                    "%d-%m-%Y %H:%M:%S"
+                ),
+                "Image": uploaded_file.name
+            }
+
+            st.session_state.history.append(
+                st.session_state.last_prediction.copy()
             )
 
-        st.subheader("Prediction Result")
-        st.success(DR_GRADES[predicted_grade])
+        if "last_prediction" in st.session_state:
 
-        st.metric(
-            "Model Confidence",
-            f"{confidence:.2f}%"
+            result = st.session_state.last_prediction
+
+            st.divider()
+            st.subheader("Prediction Results")
+
+            col1, col2 = st.columns(2)
+
+            col1.metric(
+                "Predicted Grade",
+                f"Grade {result['Grade']}"
+            )
+
+            col2.metric(
+                "Model Score",
+                f"{result['Score']:.2f}%"
+            )
+
+            st.success(result["Diagnosis"])
+
+            st.write(GRADE_INFO[result["Grade"]])
+
+            st.caption(
+                "The model score is not a calibrated probability "
+                "or a measure of diagnostic certainty."
+            )
+
+            st.subheader("Scores Across All Five Grades")
+
+            score_df = pd.DataFrame({
+                "Grade": [
+                    f"Grade {i}" for i in range(5)
+                ],
+                "Model Score (%)": [
+                    round(float(x) * 100, 2)
+                    for x in predictions
+                ]
+            })
+
+            st.bar_chart(
+                score_df.set_index("Grade")
+            )
+
+            report = f"""
+DIABETIC RETINOPATHY SCREENING REPORT
+
+Image: {result['Image']}
+Date: {result['Time']}
+
+Predicted Grade: {result['Grade']}
+Prediction: {result['Diagnosis']}
+Model Score: {result['Score']}%
+
+IMPORTANT:
+This is an AI research prototype, not a medical diagnosis.
+Consult a qualified ophthalmologist for clinical assessment.
+"""
+
+            st.download_button(
+                "📥 Download Prediction Report",
+                data=report,
+                file_name="DR_prediction_report.txt",
+                mime="text/plain"
+            )
+
+    st.warning(
+        "This application is for research and educational use only. "
+        "It cannot diagnose or rule out diabetic retinopathy."
+    )
+
+# ---------------- HISTORY & ANALYTICS ----------------
+
+elif page == "History & Analytics":
+
+    st.title("📊 Prediction History & Analytics")
+
+    history = st.session_state.history
+
+    if len(history) == 0:
+
+        st.info(
+            "No prediction history available. "
+            "Analyze an image first."
         )
 
-        st.write("**Grade:**", predicted_grade)
+    else:
 
-        st.warning(
-            "This application is a research prototype. "
-            "It is not a medical diagnosis. Please consult "
-            "a qualified ophthalmologist for examination "
-            "and treatment decisions."
+        df = pd.DataFrame(history)
+
+        st.subheader("Prediction Summary")
+
+        col1, col2 = st.columns(2)
+
+        col1.metric("Total Predictions", len(df))
+
+        col2.metric(
+            "Average Model Score",
+            f"{df['Score'].mean():.2f}%"
         )
+
+        st.divider()
+
+        st.subheader("Grade Distribution")
+
+        grade_counts = (
+            df["Grade"]
+            .value_counts()
+            .reindex(range(5), fill_value=0)
+        )
+
+        chart_df = pd.DataFrame({
+            "Grade": [
+                f"Grade {i}" for i in range(5)
+            ],
+            "Number of Predictions": grade_counts.values
+        })
+
+        st.bar_chart(
+            chart_df.set_index("Grade")
+        )
+
+        st.divider()
+
+        st.subheader("Previous Predictions")
+
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.download_button(
+            "📥 Download History (CSV)",
+            data=df.to_csv(index=False).encode("utf-8"),
+            file_name="DR_prediction_history.csv",
+            mime="text/csv"
+        )
+
+        if st.button("Clear Prediction History"):
+            st.session_state.history = []
+            if "last_prediction" in st.session_state:
+                del st.session_state.last_prediction
+            st.rerun()
+
+# ---------------- FOOTER ----------------
 
 st.divider()
 
 st.caption(
-    "Research prototype | APTOS 2019 dataset | "
-    "EfficientNetB0"
+    "RetinaAI | EfficientNetB0 | APTOS 2019 Dataset"
 )
+
+st.caption(
+    "Research prototype only. Not intended for clinical diagnosis."
+)
+
+   
+       
+       
