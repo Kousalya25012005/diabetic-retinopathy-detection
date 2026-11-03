@@ -149,60 +149,222 @@ st.sidebar.info(
 
 # ---------------- HOME PAGE ----------------
 
+
+   
+# ---------------- HOME PAGE ----------------
+
 if page == "Home":
 
-    st.markdown(
-        '<p class="main-title">Diabetic Retinopathy Screening</p>',
-        unsafe_allow_html=True
-    )
+    st.markdown("""
+    <style>
+    .hero {
+        background: linear-gradient(120deg, #0B2038, #135B70, #168C91);
+        padding: 42px;
+        border-radius: 22px;
+        color: white;
+        margin-bottom: 25px;
+        box-shadow: 0 8px 25px rgba(15,45,70,0.15);
+    }
+    .hero h1 {
+        color: white !important;
+        font-size: 42px !important;
+        margin-bottom: 8px;
+    }
+    .hero p {
+        color: #E1F7F7 !important;
+        font-size: 17px;
+    }
+    .tag {
+        background: rgba(255,255,255,0.15);
+        padding: 7px 13px;
+        border-radius: 20px;
+        display: inline-block;
+        color: white;
+        font-size: 12px;
+        margin-bottom: 18px;
+    }
+    .info-card {
+        background: white;
+        border: 1px solid #DFEAF1;
+        border-radius: 16px;
+        padding: 22px;
+        min-height: 145px;
+        box-shadow: 0 4px 14px rgba(20,50,80,0.05);
+    }
+    .info-card h3 {
+        color: #176B87 !important;
+        font-size: 14px !important;
+    }
+    .info-card h2 {
+        color: #12304A !important;
+        font-size: 27px !important;
+    }
+    .info-card p {
+        color: #627D98 !important;
+        font-size: 13px;
+    }
+    .grade-card {
+        background: white;
+        border: 1px solid #DFEAF1;
+        border-radius: 14px;
+        padding: 16px 8px;
+        text-align: center;
+        min-height: 135px;
+    }
+    .grade-card h2 {
+        font-size: 30px;
+        margin: 0;
+    }
+    .grade-card p {
+        color: #12304A !important;
+        font-weight: 650;
+        font-size: 13px;
+    }
+    .section-note {
+        color: #627D98 !important;
+        font-size: 14px;
+    }
+    </style>
 
-    st.markdown(
-        '<p class="subtitle">AI-powered retinal image classification using EfficientNetB0.</p>',
-        unsafe_allow_html=True
-    )
-
-    st.divider()
+    <div class="hero">
+        <div class="tag">✦ AI-POWERED RETINAL ANALYSIS</div>
+        <h1>Welcome to RetinaAI</h1>
+        <p>
+        Exploring diabetic retinopathy through deep learning
+        and intelligent retinal image classification.
+        </p>
+        <p>EfficientNetB0 &nbsp; • &nbsp; APTOS 2019 Dataset</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     total = len(st.session_state.history)
+    grades_found = len(set(
+        x["Grade"] for x in st.session_state.history
+    ))
 
-    st.subheader("Dashboard Overview")
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Total Predictions", total)
-
-    col2.metric(
-        "Grades Detected",
-        len(set(x["Grade"] for x in st.session_state.history))
+    st.markdown("### ✦ Dashboard at a glance")
+    st.markdown(
+        '<p class="section-note">Your application overview</p>',
+        unsafe_allow_html=True
     )
 
-    col3.metric(
-        "Model",
-        "EfficientNetB0"
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        st.markdown(f"""
+        <div class="info-card">
+            <h3>◉ TOTAL PREDICTIONS</h3>
+            <h2>{total}</h2>
+            <p>Images analyzed in this session</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c2:
+        st.markdown("""
+        <div class="info-card">
+            <h3>◎ CLASSIFICATION</h3>
+            <h2>05 Grades</h2>
+            <p>Severity categories supported</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c3:
+        st.markdown("""
+        <div class="info-card">
+            <h3>✧ DEEP LEARNING MODEL</h3>
+            <h2>EfficientNetB0</h2>
+            <p>Image classification architecture</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.write("")
+    st.markdown("### ✦ Understanding the five grades")
+    st.markdown(
+        '<p class="section-note">Five categories used by the classification model</p>',
+        unsafe_allow_html=True
     )
 
-    st.divider()
+    grade_data = [
+        ("0", "No DR", "#21865B"),
+        ("1", "Mild", "#3688B7"),
+        ("2", "Moderate", "#C58A26"),
+        ("3", "Severe", "#D46C3D"),
+        ("4", "Proliferative", "#B74755")
+    ]
 
-    st.subheader("About This Project")
+    cols = st.columns(5)
 
-    st.write("""
-    This application uses a deep learning model to classify
-    retinal fundus images into five diabetic retinopathy grades.
+    for col, (number, name, color) in zip(cols, grade_data):
+        with col:
+            st.markdown(f"""
+            <div class="grade-card">
+                <h2 style="color:{color} !important;">
+                    {number}
+                </h2>
+                <p>{name}</p>
+                <span style="color:#829AB1;font-size:11px;">
+                    DR GRADE
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
 
-    The model is based on EfficientNetB0 and was trained using
-    the APTOS 2019 Blindness Detection dataset.
-    """)
+    st.write("")
+    st.markdown("### ✦ How RetinaAI works")
 
-    st.subheader("Five Classification Grades")
+    a, b, c = st.columns(3)
 
-    for grade, name in DR_GRADES.items():
-        with st.expander(f"Grade {grade}: {name}"):
-            st.write(GRADE_INFO[grade])
+    with a:
+        st.markdown("""
+        <div class="info-card">
+            <h2>📤</h2>
+            <h3>01 · UPLOAD IMAGE</h3>
+            <p>Choose a retinal fundus photograph in JPG or PNG format.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    st.info(
-        "Upload a retinal fundus image using the Analyze Image "
-        "section to generate a prediction."
+    with b:
+        st.markdown("""
+        <div class="info-card">
+            <h2>🧠</h2>
+            <h3>02 · AI ANALYSIS</h3>
+            <p>The EfficientNetB0 model generates classification scores.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with c:
+        st.markdown("""
+        <div class="info-card">
+            <h2>📊</h2>
+            <h3>03 · VIEW RESULTS</h3>
+            <p>Review the predicted grade, scores and session history.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.write("")
+    st.markdown("""
+    <div style="
+        background:#E7F3F7;
+        border-left:5px solid #168C91;
+        padding:20px;
+        border-radius:12px;
+    ">
+        <h3 style="color:#12304A;">About the project</h3>
+        <p style="color:#36566F;">
+        RetinaAI is a research application developed using
+        the APTOS 2019 Blindness Detection dataset. It explores
+        five-class diabetic retinopathy image classification
+        using a pretrained EfficientNetB0 architecture.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.write("")
+    st.warning(
+        "Research prototype only. Model predictions are not "
+        "medical diagnoses. Consult an ophthalmologist for "
+        "clinical assessment."
     )
+
 
 # ---------------- IMAGE ANALYSIS ----------------
 
