@@ -1,3 +1,5 @@
+
+import os
 import streamlit as st
 import tensorflow as tf
 import numpy as np
@@ -11,6 +13,16 @@ st.set_page_config(
     page_title="RetinaAI | DR Screening",
     page_icon="👁️",
     layout="wide"
+)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_DIR = os.path.join(BASE_DIR, "web_app")
+
+B0_PATH = os.path.join(
+    MODEL_DIR, "ensemble_efficientnetb0_300.keras"
+)
+B3_PATH = os.path.join(
+    MODEL_DIR, "ensemble_efficientnetb3_300.keras"
 )
 
 # ---------------- CUSTOM DESIGN ----------------
@@ -42,34 +54,140 @@ p, label, .stMarkdown, .stText {
     border-radius: 12px;
     border: 1px solid #D9E2EC;
 }
-    border: none;
-}
 .stButton button p {
     color: #FFFFFF !important;
 }
 .stCaption {
     color: #627D98 !important;
 }
+.hero {
+    background: linear-gradient(120deg, #0B2038, #135B70, #168C91);
+    padding: 42px;
+    border-radius: 22px;
+    color: white;
+    margin-bottom: 25px;
+    box-shadow: 0 8px 25px rgba(15,45,70,0.15);
+}
+.hero h1 {
+    color: white !important;
+    font-size: 42px !important;
+    margin-bottom: 8px;
+}
+.hero p {
+    color: #E1F7F7 !important;
+    font-size: 17px;
+}
+.tag {
+    background: rgba(255,255,255,0.15);
+    padding: 7px 13px;
+    border-radius: 20px;
+    display: inline-block;
+    color: white;
+    font-size: 12px;
+    margin-bottom: 18px;
+}
+.info-card {
+    background: white;
+    border: 1px solid #DFEAF1;
+    border-radius: 16px;
+    padding: 22px;
+    min-height: 145px;
+    box-shadow: 0 4px 14px rgba(20,50,80,0.05);
+}
+.info-card h3 {
+    color: #176B87 !important;
+    font-size: 14px !important;
+}
+.info-card h2 {
+    color: #12304A !important;
+    font-size: 25px !important;
+}
+.info-card p {
+    color: #627D98 !important;
+    font-size: 13px;
+}
+.grade-card {
+    background: white;
+    border: 1px solid #DFEAF1;
+    border-radius: 14px;
+    padding: 16px 8px;
+    text-align: center;
+    min-height: 135px;
+}
+.grade-card h2 {
+    font-size: 30px;
+    margin: 0;
+}
+.grade-card p {
+    color: #12304A !important;
+    font-weight: 650;
+    font-size: 13px;
+}
+.section-note {
+    color: #627D98 !important;
+    font-size: 14px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- MODEL ----------------
-
-MODEL_PATH = "dr_model.keras"
+# ---------------- ENSEMBLE MODELS ----------------
 
 @st.cache_resource
-def load_model():
-    return tf.keras.models.load_model(MODEL_PATH)
+def load_models():
+    b0 = tf.keras.models.load_model(B0_PATH)
+    b3 = tf.keras.models.load_model(B3_PATH)
+    return b0, b3
+
+if not os.path.exists(B0_PATH) or not os.path.exists(B3_PATH):
+    st.error("One or both ensemble model files are missing.")
+    st.write("Expected model folder:", MODEL_DIR)
+    st.stop()
 
 try:
-    model = load_model()
+    b0_model, b3_model = load_models()
 except Exception as exc:
-    st.error(
-        f"Could not load the model file '{MODEL_PATH}'. "
-        "Make sure it is in the same folder as app.py and is a valid Keras model."
-    )
+    st.error("Could not load the EfficientNet ensemble models.")
     st.exception(exc)
     st.stop()
+
+# ---------------- PREDICTION FUNCTION ----------------
+
+def predict_ensemble(image):
+    processed_image = image.resize((300, 300))
+
+    image_array = np.array(
+        processed_image, dtype=np.float32
+    )
+    image_array = np.expand_dims(image_array, axis=0)
+
+    # Horizontal-flip test-time augmentation
+    flipped_array = np.flip(
+        image_array, axis=2
+    ).copy()
+
+    # EfficientNetB0 predictions
+    b0_original = b0_model.predict(image_array, verbose=0)
+    b0_flipped = b0_model.predict(flipped_array, verbose=0)
+    b0_tta = (b0_original + b0_flipped) / 2
+
+    # EfficientNetB3 predictions
+    b3_original = b3_model.predict(image_array, verbose=0)
+    b3_flipped = b3_model.predict(flipped_array, verbose=0)
+    b3_tta = (b3_original + b3_flipped) / 2
+
+    # Average both model outputs
+    final_predictions = (b0_tta + b3_tta) / 2
+    predictions = np.asarray(final_predictions).reshape(-1)
+
+    if predictions.size != 5:
+        raise ValueError(
+            f"Expected five class scores, got {predictions.size}."
+        )
+
+    if not np.all(np.isfinite(predictions)):
+        raise ValueError("The model returned invalid prediction values.")
+
+    return predictions
 
 # ---------------- DISEASE GRADES ----------------
 
@@ -109,82 +227,13 @@ st.sidebar.divider()
 st.sidebar.info(
     "Research prototype based on the APTOS 2019 dataset."
 )
-   
+st.sidebar.caption("EfficientNetB0 + EfficientNetB3 Ensemble")
+
 # ---------------- HOME PAGE ----------------
 
 if page == "Home":
 
     st.markdown("""
-    <style>
-    .hero {
-        background: linear-gradient(120deg, #0B2038, #135B70, #168C91);
-        padding: 42px;
-        border-radius: 22px;
-        color: white;
-        margin-bottom: 25px;
-        box-shadow: 0 8px 25px rgba(15,45,70,0.15);
-    }
-    .hero h1 {
-        color: white !important;
-        font-size: 42px !important;
-        margin-bottom: 8px;
-    }
-    .hero p {
-        color: #E1F7F7 !important;
-        font-size: 17px;
-    }
-    .tag {
-        background: rgba(255,255,255,0.15);
-        padding: 7px 13px;
-        border-radius: 20px;
-        display: inline-block;
-        color: white;
-        font-size: 12px;
-        margin-bottom: 18px;
-    }
-    .info-card {
-        background: white;
-        border: 1px solid #DFEAF1;
-        border-radius: 16px;
-        padding: 22px;
-        min-height: 145px;
-        box-shadow: 0 4px 14px rgba(20,50,80,0.05);
-    }
-    .info-card h3 {
-        color: #176B87 !important;
-        font-size: 14px !important;
-    }
-    .info-card h2 {
-        color: #12304A !important;
-        font-size: 27px !important;
-    }
-    .info-card p {
-        color: #627D98 !important;
-        font-size: 13px;
-    }
-    .grade-card {
-        background: white;
-        border: 1px solid #DFEAF1;
-        border-radius: 14px;
-        padding: 16px 8px;
-        text-align: center;
-        min-height: 135px;
-    }
-    .grade-card h2 {
-        font-size: 30px;
-        margin: 0;
-    }
-    .grade-card p {
-        color: #12304A !important;
-        font-weight: 650;
-        font-size: 13px;
-    }
-    .section-note {
-        color: #627D98 !important;
-        font-size: 14px;
-    }
-    </style>
-
     <div class="hero">
         <div class="tag">✦ AI-POWERED RETINAL ANALYSIS</div>
         <h1>Welcome to RetinaAI</h1>
@@ -192,14 +241,14 @@ if page == "Home":
         Exploring diabetic retinopathy through deep learning
         and intelligent retinal image classification.
         </p>
-        <p>EfficientNetB0 &nbsp; • &nbsp; APTOS 2019 Dataset</p>
+        <p>
+        EfficientNetB0 + EfficientNetB3 Ensemble
+        &nbsp; • &nbsp; APTOS 2019 Dataset
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
     total = len(st.session_state.history)
-    grades_found = len(set(
-        x["Grade"] for x in st.session_state.history
-    ))
 
     st.markdown("### ✦ Dashboard at a glance")
     st.markdown(
@@ -231,8 +280,8 @@ if page == "Home":
         st.markdown("""
         <div class="info-card">
             <h3>✧ DEEP LEARNING MODEL</h3>
-            <h2>EfficientNetB0</h2>
-            <p>Image classification architecture</p>
+            <h2>B0 + B3 Ensemble</h2>
+            <p>Two EfficientNet architectures</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -257,9 +306,7 @@ if page == "Home":
         with col:
             st.markdown(f"""
             <div class="grade-card">
-                <h2 style="color:{color} !important;">
-                    {number}
-                </h2>
+                <h2 style="color:{color} !important;">{number}</h2>
                 <p>{name}</p>
                 <span style="color:#829AB1;font-size:11px;">
                     DR GRADE
@@ -286,7 +333,7 @@ if page == "Home":
         <div class="info-card">
             <h2>🧠</h2>
             <h3>02 · AI ANALYSIS</h3>
-            <p>The EfficientNetB0 model generates classification scores.</p>
+            <p>Two EfficientNet models analyze the image and its horizontal flip.</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -295,7 +342,7 @@ if page == "Home":
         <div class="info-card">
             <h2>📊</h2>
             <h3>03 · VIEW RESULTS</h3>
-            <p>Review the predicted grade, scores and session history.</p>
+            <p>Review the ensemble prediction, grade scores and session history.</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -312,7 +359,8 @@ if page == "Home":
         RetinaAI is a research application developed using
         the APTOS 2019 Blindness Detection dataset. It explores
         five-class diabetic retinopathy image classification
-        using a pretrained EfficientNetB0 architecture.
+        using an EfficientNetB0 and EfficientNetB3 ensemble
+        with horizontal-flip test-time augmentation.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -324,12 +372,11 @@ if page == "Home":
         "clinical assessment."
     )
 
-
-    # ---------------- IMAGE ANALYSIS ----------------
+# ---------------- IMAGE ANALYSIS ----------------
 
 elif page == "Analyze Image":
-    st.title("🔬 Analyze Retinal Image")
 
+    st.title("🔬 Analyze Retinal Image")
     st.write(
         "Upload a retinal fundus photograph for AI-based classification."
     )
@@ -340,12 +387,12 @@ elif page == "Analyze Image":
     )
 
     if uploaded_file is not None:
+
         try:
             image = Image.open(uploaded_file)
             image = ImageOps.exif_transpose(image).convert("RGB")
-        except Exception as exc:
+        except Exception:
             st.error("The uploaded file could not be opened as an image.")
-            st.exception(exc)
             st.stop()
 
         col1, col2 = st.columns(2)
@@ -356,35 +403,20 @@ elif page == "Analyze Image":
                 caption="Uploaded Retinal Image",
                 use_container_width=True
             )
-                    
+
         with col2:
             st.write("### Image Information")
             st.write("File name:", uploaded_file.name)
             st.write("Image dimensions:", image.size)
+            st.write("Model input:", "300 × 300")
 
         if st.button("Analyze Image", type="primary"):
-            with st.spinner("Analyzing retinal image..."):
+
+            with st.spinner(
+                "Analyzing image with EfficientNet ensemble..."
+            ):
                 try:
-                    processed_image = image.resize((224, 224))
-
-                    image_array = np.array(
-                        processed_image,
-                        dtype=np.float32
-                    )
-                    image_array = np.expand_dims(image_array, axis=0)
-
-                    predictions = np.asarray(
-                        model.predict(image_array, verbose=0)
-                    ).reshape(-1)
-
-                    if predictions.size != 5:
-                        st.error(
-                            "The model did not return five class scores. "
-                            f"It returned {predictions.size} value(s). "
-                            "Check that the loaded model has the expected "
-                            "five-class output."
-                        )
-                        st.stop()
+                    predictions = predict_ensemble(image)
 
                     predicted_grade = int(np.argmax(predictions))
                     score = float(predictions[predicted_grade] * 100)
@@ -393,7 +425,9 @@ elif page == "Analyze Image":
                         "Grade": predicted_grade,
                         "Diagnosis": DR_GRADES[predicted_grade],
                         "Score": round(score, 2),
-                        "Time": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                        "Time": datetime.now().strftime(
+                            "%d-%m-%Y %H:%M:%S"
+                        ),
                         "Image": uploaded_file.name,
                         "Grade Scores": [
                             round(float(value) * 100, 2)
@@ -423,7 +457,7 @@ elif page == "Analyze Image":
             )
 
             col2.metric(
-                "Model Score",
+                "Ensemble Score",
                 f"{result['Score']:.2f}%"
             )
 
@@ -431,7 +465,7 @@ elif page == "Analyze Image":
             st.write(GRADE_INFO[result["Grade"]])
 
             st.caption(
-                "The model score is not a calibrated probability "
+                "The ensemble score is not a calibrated probability "
                 "or a measure of diagnostic certainty."
             )
 
@@ -439,7 +473,7 @@ elif page == "Analyze Image":
 
             score_df = pd.DataFrame({
                 "Grade": [f"Grade {i}" for i in range(5)],
-                "Model Score (%)": result["Grade Scores"]
+                "Ensemble Score (%)": result["Grade Scores"]
             })
 
             st.bar_chart(score_df.set_index("Grade"))
@@ -452,7 +486,11 @@ Date: {result['Time']}
 
 Predicted Grade: {result['Grade']}
 Prediction: {result['Diagnosis']}
-Model Score: {result['Score']}%
+Ensemble Score: {result['Score']}%
+
+Model: EfficientNetB0 + EfficientNetB3 Ensemble
+Input Size: 300 x 300
+Inference: Horizontal-flip test-time augmentation
 
 IMPORTANT:
 This is an AI research prototype, not a medical diagnosis.
@@ -474,8 +512,8 @@ Consult a qualified ophthalmologist for clinical assessment.
 # ---------------- HISTORY & ANALYTICS ----------------
 
 elif page == "History & Analytics":
-    st.title("📊 Prediction History & Analytics")
 
+    st.title("📊 Prediction History & Analytics")
     history = st.session_state.history
 
     if len(history) == 0:
@@ -490,9 +528,8 @@ elif page == "History & Analytics":
         col1, col2 = st.columns(2)
 
         col1.metric("Total Predictions", len(df))
-
         col2.metric(
-            "Average Model Score",
+            "Average Ensemble Score",
             f"{df['Score'].mean():.2f}%"
         )
 
@@ -515,7 +552,9 @@ elif page == "History & Analytics":
         st.divider()
         st.subheader("Previous Predictions")
 
-        display_df = df.drop(columns=["Grade Scores"], errors="ignore")
+        display_df = df.drop(
+            columns=["Grade Scores"], errors="ignore"
+        )
 
         st.dataframe(
             display_df,
@@ -540,5 +579,10 @@ elif page == "History & Analytics":
 
 st.divider()
 
-st.caption("RetinaAI | EfficientNetB0 | APTOS 2019 Dataset")
-st.caption("Research prototype only. Not intended for clinical diagnosis.")
+st.caption(
+    "RetinaAI | EfficientNetB0 + EfficientNetB3 Ensemble | "
+    "APTOS 2019 Dataset | 300 × 300"
+)
+st.caption(
+    "Research prototype only. Not intended for clinical diagnosis."
+)
